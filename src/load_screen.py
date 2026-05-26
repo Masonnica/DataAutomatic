@@ -1,5 +1,6 @@
 import asyncio
 import httpx
+import json
 
 from rich.text import Text
 from textual.app import App, ComposeResult
@@ -7,6 +8,8 @@ from textual.widgets import *
 from textual.binding import Binding
 
 from widget.EditableRichLog import EditRichLog
+
+REPO = "Masonnica/DataAutomatic"
 
 class LoadScreen(App):
     _log = None
@@ -17,6 +20,8 @@ class LoadScreen(App):
         "check_version",
         "check_color",
     ]
+
+    ask_update = False
 
     CSS_PATH = "load_screen.tcss"
     BINDINGS = [
@@ -35,19 +40,31 @@ class LoadScreen(App):
         self.set_interval(0.3, self.update_bar_width)
         self.set_interval(1, self.done)
 
+        asyncio.create_task(self.run_all_checks())
+
+    async def run_all_checks(self) -> None:
+        tasks = []
         for i in range(len(self.check_list)):
             fn = getattr(self, self.check_list[i])
-            asyncio.create_task(fn(i))
+            tasks.append(fn(i))
+
+        await asyncio.gather(*tasks)
 
     def update_bar_width(self) -> None:
         if self._bar is None:
             return
         self._bar.styles.width = self.size.width - 2
 
-    def done(self):
+    def ask_update_version(self):
+        pass
+
+    def update_version(self):
+        pass
+
+    def done(self) -> None:
         if self._bar is None:
             return
-        if self._bar.progress == len(self.check_list):
+        if self._bar.progress == len(self.check_list) and not self.ask_update:
             self.exit()
 
     async def check_network(self, index: int) -> None:
@@ -69,7 +86,30 @@ class LoadScreen(App):
     async def check_version(self, index: int) -> None:
         self._log.write(Text.from_markup("Version\t\tChecking..."))
 
-        # TODO: Write function
+        with open("info.json", "r", encoding="utf-8") as f:
+            data_f = json.load(f)
+            f.close()
+
+        url = f"https://api.github.com/repos/{REPO}/releases/latest"
+
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, timeout=1)
+            data_g = response.json()
+
+        try:
+            latest = data_g["tag_name"]
+
+            if latest == data_f["version"]:
+                text = Text.from_markup("Version\t\tOk")
+                text.stylize("green", 0, len(text))
+                self._log.rewrite(index, text)
+            else:
+                text = Text.from_markup(f"[rgb(255,255,0)]Version\t\tA new version is available: {latest}[/]")
+                self._log.rewrite(index, text)
+                self.ask_update = True
+        except:
+            text = Text.from_markup(f"[rgb(255,255,0)]Version\t\tNot found![/]")
+            self._log.rewrite(index, text)
 
         self._bar.advance(1)
 

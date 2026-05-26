@@ -1,3 +1,7 @@
+Screen {
+    overflow: hidden;
+}
+
 ProgressBar {
     dock: bottom;
 }

@@ -8,6 +8,8 @@ class DataAutomatic(App):
     TITLE = "Data Automatic"
     SUB_TITLE = "v0.0"
 
+    CSS_PATH = "app_screen.tcss"
+
     def on_load(self):
         pass
 
